@@ -1,6 +1,7 @@
 package com.dali951.xpfarmchestscan.gui;
 
 import com.dali951.xpfarmchestscan.scan.ScanResult;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -29,9 +30,14 @@ public class ScanSummaryScreen extends Screen {
         int left = (this.width - width) / 2;
         int top = (this.height - 250) / 2;
 
-        Button closeButton = Button.builder(Component.translatable("xpfarm-chestscan.summary.close"), b -> this.onClose())
-                .bounds(left, top + 206, width, 20).build();
+        Button checklistButton = Button.builder(Component.translatable("xpfarm-chestscan.summary.openChecklist"), b ->
+                Minecraft.getInstance().gui.setScreen(new ChecklistScreen()))
+                .bounds(left, top + 206, 150, 20).build();
 
+        Button closeButton = Button.builder(Component.translatable("xpfarm-chestscan.summary.close"), b -> this.onClose())
+                .bounds(left + 158, top + 206, width - 158, 20).build();
+
+        addRenderableWidget(checklistButton);
         addRenderableWidget(closeButton);
     }
 

@@ -9,6 +9,9 @@ public final class ChecklistData {
     public record Goal(String id, String label, int needed) {
     }
 
+    public record GatherGoal(String id, String label, int needed, List<String> matchIds) {
+    }
+
     public static final List<Goal> GOALS = List.of(
             new Goal("minecraft:stone_bricks", "Stone bricks", 6978),
             new Goal("minecraft:stone_brick_stairs", "Stone brick stairs", 5508),
@@ -45,6 +48,31 @@ public final class ChecklistData {
         }
     }
 
+    private static final List<String> ALL_LOG_IDS = List.of(
+            "minecraft:oak_log", "minecraft:spruce_log", "minecraft:birch_log",
+            "minecraft:jungle_log", "minecraft:acacia_log", "minecraft:dark_oak_log",
+            "minecraft:mangrove_log", "minecraft:cherry_log", "minecraft:pale_oak_log",
+            "minecraft:crimson_stem", "minecraft:warped_stem"
+    );
+
+    public static final List<GatherGoal> GATHER = List.of(
+            new GatherGoal("minecraft:stone", "Stone (silk touch)", 16032, List.of("minecraft:stone")),
+            new GatherGoal("minecraft:dark_oak_log", "Dark oak logs", 716, List.of("minecraft:dark_oak_log")),
+            new GatherGoal("logs_any", "Wood logs (any)", 260, ALL_LOG_IDS),
+            new GatherGoal("minecraft:white_wool", "White wool", 480, List.of("minecraft:white_wool")),
+            new GatherGoal("minecraft:iron_ingot", "Iron ingots", 285, List.of("minecraft:iron_ingot")),
+            new GatherGoal("minecraft:redstone", "Redstone dust", 60, List.of("minecraft:redstone")),
+            new GatherGoal("minecraft:quartz", "Nether quartz", 5, List.of("minecraft:quartz")),
+            new GatherGoal("minecraft:coal", "Coal", 60, List.of("minecraft:coal")),
+            new GatherGoal("minecraft:sand", "Sand", 214, List.of("minecraft:sand")),
+            new GatherGoal("minecraft:obsidian", "Obsidian", 4, List.of("minecraft:obsidian")),
+            new GatherGoal("minecraft:diamond", "Diamonds", 2, List.of("minecraft:diamond")),
+            new GatherGoal("minecraft:leather", "Leather", 45, List.of("minecraft:leather")),
+            new GatherGoal("minecraft:sugar_cane", "Sugar cane", 45, List.of("minecraft:sugar_cane")),
+            new GatherGoal("minecraft:water_bucket", "Water buckets", 3, List.of("minecraft:water_bucket")),
+            new GatherGoal("minecraft:lava_bucket", "Lava bucket", 1, List.of("minecraft:lava_bucket"))
+    );
+
     private ChecklistData() {
     }
 
@@ -56,6 +84,14 @@ public final class ChecklistData {
     public static int totalNeeded() {
         int total = 0;
         for (Goal g : GOALS) {
+            total += g.needed();
+        }
+        return total;
+    }
+
+    public static int totalGather() {
+        int total = 0;
+        for (GatherGoal g : GATHER) {
             total += g.needed();
         }
         return total;

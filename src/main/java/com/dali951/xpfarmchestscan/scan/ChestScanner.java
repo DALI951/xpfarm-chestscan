@@ -151,7 +151,7 @@ public class ChestScanner {
         scanning = false;
         phase = Phase.IDLE;
         clearIntercept();
-        ChestStore.applyScan(new TreeMap<>(result.totals));
+        ChestStore.applyScan(result);
         ChestDumpWriter.write(mc, result);
         if (mc.player != null) {
             mc.player.sendSystemMessage(Component.translatable(
