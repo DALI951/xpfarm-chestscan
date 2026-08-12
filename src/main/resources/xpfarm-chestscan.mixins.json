@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "com.dali951.xpfarmchestscan.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ContainerContentMixin",
+    "OpenScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

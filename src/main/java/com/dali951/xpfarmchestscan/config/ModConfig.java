@@ -1,0 +1,101 @@
+package com.dali951.xpfarmchestscan.config;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ModConfig {
+
+    public double radius = 4.5;
+    public String outputFileName = "xpfarm-chests.json";
+    public List<int[]> positions = new ArrayList<>();
+
+    public void addPosition(int x, int y, int z) {
+        for (int[] p : positions) {
+            if (p[0] == x && p[1] == y && p[2] == z) {
+                return;
+            }
+        }
+        positions.add(new int[]{x, y, z});
+    }
+
+    public void removePosition(int index) {
+        if (index >= 0 && index < positions.size()) {
+            positions.remove(index);
+        }
+    }
+
+    public int size() {
+        return positions.size();
+    }
+
+    public int[] get(int index) {
+        return positions.get(index);
+    }
+
+    public static ModConfig load() {
+        Path path = configPath();
+        ModConfig config = new ModConfig();
+        if (!Files.exists(path)) {
+            return config;
+        }
+        try {
+            String raw = Files.readString(path, StandardCharsets.UTF_8);
+            JsonObject obj = new Gson().fromJson(raw, JsonObject.class);
+            if (obj == null) {
+                return config;
+            }
+            if (obj.has("radius")) {
+                config.radius = Math.min(8.0, Math.max(1.0, obj.get("radius").getAsDouble()));
+            }
+            if (obj.has("outputFileName")) {
+                config.outputFileName = obj.get("outputFileName").getAsString();
+            }
+            if (obj.has("positions") && obj.get("positions").isJsonArray()) {
+                for (JsonElement e : obj.getAsJsonArray("positions")) {
+                    JsonArray a = e.getAsJsonArray();
+                    if (a.size() == 3) {
+                        config.positions.add(new int[]{a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()});
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return config;
+    }
+
+    public void save() {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("radius", radius);
+        obj.addProperty("outputFileName", outputFileName);
+        JsonArray arr = new JsonArray();
+        for (int[] p : positions) {
+            JsonArray a = new JsonArray();
+            a.add(p[0]);
+            a.add(p[1]);
+            a.add(p[2]);
+            arr.add(a);
+        }
+        obj.add("positions", arr);
+        Path path = configPath();
+        try {
+            Files.createDirectories(path.getParent());
+            Files.writeString(path, new GsonBuilder().setPrettyPrinting().create().toJson(obj), StandardCharsets.UTF_8);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static Path configPath() {
+        return FabricLoader.getInstance().getConfigDir().resolve("xpfarm-chestscan.json");
+    }
+}

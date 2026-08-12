@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "xpfarm-chestscan",
+  "version": "${version}",
+  "name": "XP Farm Chest Scan",
+  "description": "Client-only chest scanner for the Mega Mob XP Farm build. Scans the chests on your allowlist that are within reach, silently reads their contents and writes xpfarm-chests.json to the game directory.",
+  "authors": [
+    "DALI951"
+  ],
+  "contact": {
+    "homepage": "https://github.com/DALI951/xpfarm-chestscan",
+    "sources": "https://github.com/DALI951/xpfarm-chestscan",
+    "issues": "https://github.com/DALI951/xpfarm-chestscan/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/xpfarm-chestscan/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.dali951.xpfarmchestscan.XpFarmChestscanClient"
+    ],
+    "modmenu": [
+      "com.dali951.xpfarmchestscan.gui.ModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "xpfarm-chestscan.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}
