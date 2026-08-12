@@ -7,6 +7,7 @@ import com.dali951.xpfarmchestscan.scan.ChestScanner;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
@@ -30,29 +31,32 @@ public class ChecklistScreen extends Screen {
     private static final int ROW_HEIGHT = 22;
     private static final int VISIBLE_ROWS = 9;
 
-    private final List<GoalRow> rows = new ArrayList<>();
-    private final List<Button> tabButtons = new ArrayList<>();
-    private int scrollOffset = 0;
-    private Tab tab = Tab.BUILD;
-
-    private static class GoalRow {
+    private static class RenderedRow {
         final String builtKey;
-        final String label;
         final Button minus;
         final Button plusOne;
         final Button plusStack;
 
-        GoalRow(String builtKey, String label, Button minus, Button plusOne, Button plusStack) {
+        RenderedRow(String builtKey, Button minus, Button plusOne, Button plusStack) {
             this.builtKey = builtKey;
-            this.label = label;
             this.minus = minus;
             this.plusOne = plusOne;
             this.plusStack = plusStack;
         }
     }
 
+    private final List<RenderedRow> rows = new ArrayList<>();
+    private final List<Button> tabButtons = new ArrayList<>();
+    private int scrollOffset = 0;
+    private final Tab tab;
+
     public ChecklistScreen() {
+        this(Tab.BUILD);
+    }
+
+    private ChecklistScreen(Tab tab) {
         super(Component.translatable("xpfarm-chestscan.checklist.title"));
+        this.tab = tab;
     }
 
     @Override
@@ -61,46 +65,49 @@ public class ChecklistScreen extends Screen {
         ChestStore.ensureLoaded(mc);
         int left = (this.width - SCREEN_WIDTH) / 2;
         int top = (this.height - SCREEN_HEIGHT) / 2;
-        int listBottom = listTop(left, top) + VISIBLE_ROWS * ROW_HEIGHT;
         scrollOffset = 0;
-
-        rebuildUi(left, top, listBottom);
-        LOGGER.info("xpfarm checklist opened: tab={} goalRows={} gatherRows={} chests={} width={} height={}",
+        rebuildUi(left, top);
+        LOGGER.info("xpfarm checklist opened: tab={} goals={} gather={} chests={} width={} height={}",
                 tab, ChecklistData.GOALS.size(), ChecklistData.GATHER.size(), ChestStore.chests().size(),
                 this.width, this.height);
     }
 
-    private int listTop(int left, int top) {
-        return top + 76;
-    }
-
-    private void rebuildUi(int left, int top, int listBottom) {
-        for (GoalRow row : rows) {
-            removeWidget(row.minus);
-            removeWidget(row.plusOne);
-            removeWidget(row.plusStack);
-        }
-        rows.clear();
-        for (Button b : tabButtons) {
-            removeWidget(b);
-        }
-        tabButtons.clear();
-
+    private void rebuildUi(int left, int top) {
         int tabY = top + 48;
         int tabW = (SCREEN_WIDTH - 8) / 3;
         tabButtons.add(Button.builder(Component.translatable("xpfarm-chestscan.checklist.tabBuild"),
-                b -> setTab(Tab.BUILD)).bounds(left, tabY, tabW, 20).build());
+                b -> openTab(Tab.BUILD)).bounds(left, tabY, tabW, 20).build());
         tabButtons.add(Button.builder(Component.translatable("xpfarm-chestscan.checklist.tabGather"),
-                b -> setTab(Tab.GATHER)).bounds(left + tabW + 4, tabY, tabW, 20).build());
+                b -> openTab(Tab.GATHER)).bounds(left + tabW + 4, tabY, tabW, 20).build());
         tabButtons.add(Button.builder(Component.translatable("xpfarm-chestscan.checklist.tabChests"),
-                b -> setTab(Tab.CHESTS)).bounds(left + 2 * (tabW + 4), tabY, tabW, 20).build());
+                b -> openTab(Tab.CHESTS)).bounds(left + 2 * (tabW + 4), tabY, tabW, 20).build());
         for (Button b : tabButtons) {
             addRenderableWidget(b);
         }
 
-        int listTop = listTop(left, top);
+        int listTop = listTop(top);
+        int listBottom = listTop + VISIBLE_ROWS * ROW_HEIGHT;
+
+        addRenderableOnly((ctx, mx, my, dt) -> ctx.centeredText(this.font, this.title, this.width / 2, top + 10, 0xFFFFFF));
+        addRenderableOnly((ctx, mx, my, dt) -> ctx.fill(left, listTop, left + SCREEN_WIDTH, listBottom, 0xCC181818));
         if (tab == Tab.BUILD || tab == Tab.GATHER) {
+            addRenderableOnly(drawTotalsBar(left, top, listBottom));
+            addRenderableOnly((ctx, mx, my, dt) -> ctx.text(this.font, "Item", left + 6, listTop + 6, 0x888888));
+            addRenderableOnly((ctx, mx, my, dt) -> ctx.text(this.font, "Needed", left + 158, listTop + 6, 0x888888));
+            addRenderableOnly((ctx, mx, my, dt) -> ctx.text(this.font, "Stored", left + 214, listTop + 6, 0x888888));
+            addRenderableOnly((ctx, mx, my, dt) -> ctx.text(this.font, "Built", left + 272, listTop + 6, 0x888888));
+            addRenderableOnly((ctx, mx, my, dt) -> ctx.text(this.font, "Left", left + 322, listTop + 6, 0x888888));
             buildListRows(left, listTop);
+        } else {
+            addRenderableOnly((ctx, mx, my, dt) -> {
+                String info = ChestStore.chests().isEmpty()
+                        ? Component.translatable("xpfarm-chestscan.checklist.noChests").getString()
+                        : String.format(Locale.US, "%,d chests scanned — %,d items total",
+                        ChestStore.chests().size(), ChestStore.totalStored());
+                ctx.text(this.font, info, left, top + 26, ChestStore.chests().isEmpty() ? 0xFFAA66 : 0x9AD3FF);
+            });
+            addRenderableOnly((ctx, mx, my, dt) -> ctx.text(this.font, "Chest (x, y, z)", left + 6, listTop + 6, 0x888888));
+            buildChestRows(left, listTop);
         }
 
         Button scanButton = Button.builder(Component.translatable("xpfarm-chestscan.checklist.scan"), b -> {
@@ -113,11 +120,11 @@ public class ChecklistScreen extends Screen {
             if (tab == Tab.CHESTS) {
                 return;
             }
-            for (GoalRow row : new ArrayList<>(rows)) {
+            for (RenderedRow row : new ArrayList<>(rows)) {
                 ConfigStore.get().built.remove(row.builtKey);
             }
             ConfigStore.save();
-            rebuildUi(left, top, listBottom);
+            Minecraft.getInstance().gui.setScreen(new ChecklistScreen(tab));
         }).bounds(left + SCREEN_WIDTH / 3 + 5, listBottom + 10, SCREEN_WIDTH / 3, 20).build();
 
         Button closeButton = Button.builder(Component.translatable("xpfarm-chestscan.checklist.close"), b -> this.onClose())
@@ -128,186 +135,148 @@ public class ChecklistScreen extends Screen {
         addRenderableWidget(closeButton);
     }
 
+    private Renderable drawTotalsBar(int left, int top, int listBottom) {
+        return (ctx, mx, my, dt) -> {
+            int doneTotal = 0;
+            int neededAll;
+            int doneItems;
+            if (tab == Tab.BUILD) {
+                neededAll = ChecklistData.totalNeeded();
+                doneItems = 0;
+                for (ChecklistData.Goal g : ChecklistData.GOALS) {
+                    int have = Math.min(g.needed(), ConfigStore.get().built.getOrDefault("b:" + g.id(), 0)
+                            + ChestStore.get(g.id()));
+                    doneTotal += have;
+                    if (have >= g.needed()) {
+                        doneItems++;
+                    }
+                }
+            } else {
+                neededAll = ChecklistData.totalGather();
+                doneItems = 0;
+                for (ChecklistData.GatherGoal g : ChecklistData.GATHER) {
+                    int stored = ChestStore.sumOf(g.matchIds());
+                    int have = Math.min(g.needed(), ConfigStore.get().built.getOrDefault("g:" + g.id(), 0) + stored);
+                    doneTotal += have;
+                    if (have >= g.needed()) {
+                        doneItems++;
+                    }
+                }
+            }
+            int pct = (int) Math.round(doneTotal * 100.0 / neededAll);
+            String name = tab == Tab.BUILD ? "built+stored" : "gathered+stored";
+            String overall = String.format(Locale.US, "%,d / %,d %s — %,d left — %d%% — %d/%d items done",
+                    doneTotal, neededAll, name, Math.max(0, neededAll - doneTotal), pct, doneItems, rowCount());
+            ctx.text(this.font, overall, left, top + 26, pct >= 100 ? 0x55FF7F : 0x9AD3FF);
+            int barY = top + 38;
+            ctx.fill(left, barY, left + SCREEN_WIDTH, barY + 5, 0xFF2A2A2A);
+            int barW = (int) (SCREEN_WIDTH * Math.min(1.0, (double) doneTotal / neededAll));
+            if (barW > 0) {
+                ctx.fill(left, barY, left + barW, barY + 5, pct >= 100 ? 0xFF2ECC71 : 0xFF4C8CFF);
+            }
+        };
+    }
+
     private void buildListRows(int left, int listTop) {
         int index = 0;
         if (tab == Tab.BUILD) {
             for (ChecklistData.Goal goal : ChecklistData.GOALS) {
-                String builtKey = "b:" + goal.id();
-                addGoalRow(left, listTop, index++, builtKey, goal.label());
+                addGoalRow(left, listTop, index++, "b:" + goal.id(), goal.label());
             }
         } else {
             for (ChecklistData.GatherGoal goal : ChecklistData.GATHER) {
-                String builtKey = "g:" + goal.id();
-                addGoalRow(left, listTop, index++, builtKey, goal.label());
+                addGoalRow(left, listTop, index++, "g:" + goal.id(), goal.label());
             }
         }
     }
 
     private void addGoalRow(int left, int listTop, int index, String builtKey, String label) {
         int y = listTop + 24 + index * ROW_HEIGHT;
+        Renderable rowText = (ctx, mx, my, dt) -> {
+            int yNow = listTop + 24 + index * ROW_HEIGHT - scrollOffset;
+            if (yNow < listTop + 22 || yNow >= listTop + 24 + VISIBLE_ROWS * ROW_HEIGHT - 4) {
+                return;
+            }
+            int needed = goalNeeded(builtKey);
+            int stored = goalStored(builtKey);
+            int built = ConfigStore.get().built.getOrDefault(builtKey, 0);
+            int leftN = Math.max(0, needed - stored - built);
+            int color = leftN == 0 ? 0x55FF7F : 0xE0E0E0;
+            ctx.text(this.font, label, left + 6, yNow + 3, color);
+            ctx.text(this.font, String.format(Locale.US, "%,d", needed), left + 160, yNow + 3, 0x9AD3FF);
+            ctx.text(this.font, String.format(Locale.US, "%,d", stored), left + 218, yNow + 3, 0xAAAAAA);
+            ctx.text(this.font, String.format(Locale.US, "%,d", built), left + 276, yNow + 3, 0xCCCCCC);
+            ctx.text(this.font, String.format(Locale.US, "%,d (%,d st)", leftN, leftN / 64), left + 316, yNow + 3,
+                    leftN == 0 ? 0x55FF7F : 0xFFFFFF);
+        };
         Button minus = Button.builder(Component.literal("-1"), b -> {
             ConfigStore.get().built.merge(builtKey, -1, Integer::sum);
             if (ConfigStore.get().built.get(builtKey) <= 0) {
                 ConfigStore.get().built.remove(builtKey);
             }
             ConfigStore.save();
-            reInit();
+            Minecraft.getInstance().gui.setScreen(new ChecklistScreen(tab));
         }).bounds(left + 356, y, 28, 16).build();
         Button plusOne = Button.builder(Component.literal("+1"), b -> {
             ConfigStore.get().built.merge(builtKey, 1, Integer::sum);
             ConfigStore.save();
-            reInit();
+            Minecraft.getInstance().gui.setScreen(new ChecklistScreen(tab));
         }).bounds(left + 388, y, 28, 16).build();
         Button plusStack = Button.builder(Component.literal("+64"), b -> {
             ConfigStore.get().built.merge(builtKey, 64, Integer::sum);
             ConfigStore.save();
-            reInit();
+            Minecraft.getInstance().gui.setScreen(new ChecklistScreen(tab));
         }).bounds(left + 420, y, 46, 16).build();
-        rows.add(new GoalRow(builtKey, label, minus, plusOne, plusStack));
+        rows.add(new RenderedRow(builtKey, minus, plusOne, plusStack));
+        addRenderableOnly(rowText);
         addRenderableWidget(minus);
         addRenderableWidget(plusOne);
         addRenderableWidget(plusStack);
     }
 
-    private void reInit() {
-        int left = (this.width - SCREEN_WIDTH) / 2;
-        int top = (this.height - SCREEN_HEIGHT) / 2;
-        rebuildUi(left, top, listTop(left, top) + VISIBLE_ROWS * ROW_HEIGHT);
-    }
-
-    private void setTab(Tab newTab) {
-        tab = newTab;
-        scrollOffset = 0;
-        reInit();
-    }
-
-    private void layoutRows(int left, int listTop) {
+    private void buildChestRows(int left, int listTop) {
         int index = 0;
-        for (GoalRow row : rows) {
-            int y = listTop + 24 + index * ROW_HEIGHT - scrollOffset;
-            row.minus.setPosition(left + 356, y);
-            row.plusOne.setPosition(left + 388, y);
-            row.plusStack.setPosition(left + 420, y);
+        for (ChestStore.StoredChest c : ChestStore.chests()) {
+            final int rowIndex = index;
+            Renderable rowText = (ctx, mx, my, dt) -> {
+                int yNow = listTop + 24 + rowIndex * ROW_HEIGHT - scrollOffset;
+                if (yNow < listTop + 22 || yNow >= listTop + 24 + VISIBLE_ROWS * ROW_HEIGHT - 4) {
+                    return;
+                }
+                ctx.text(this.font,
+                        String.format("(%d, %d, %d)  ·  %,d items",
+                                c.pos().getX(), c.pos().getY(), c.pos().getZ(), c.total()),
+                        left + 6, yNow + 3, 0xE0E0E0);
+                String top = topItems(c);
+                if (!top.isEmpty()) {
+                    ctx.text(this.font, top, left + 300, yNow + 3, 0x9AD3FF);
+                }
+            };
+            rows.add(new RenderedRow(null, null, null, null));
+            addRenderableOnly(rowText);
             index++;
         }
     }
 
-    @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        int left = (this.width - SCREEN_WIDTH) / 2;
-        int top = (this.height - SCREEN_HEIGHT) / 2;
-        int listTop = listTop(left, top);
-        int listBottom = listTop + VISIBLE_ROWS * ROW_HEIGHT;
-
-        ensureRowsBuilt(left, listTop);
-        layoutRows(left, listTop);
-
-        context.fill(left, listTop, left + SCREEN_WIDTH, listBottom, 0xCC181818);
-
-        context.centeredText(this.font, this.title, this.width / 2, top + 10, 0xFFFFFF);
-
-        if (tab != Tab.CHESTS) {
-            drawTotalsBar(context, left, top);
-        } else {
-            String info = ChestStore.chests().isEmpty()
-                    ? Component.translatable("xpfarm-chestscan.checklist.noChests").getString()
-                    : String.format(Locale.US, "%,d chests scanned — %,d items total",
-                    ChestStore.chests().size(), ChestStore.totalStored());
-            context.text(this.font, info, left, top + 26, ChestStore.chests().isEmpty() ? 0xFFAA66 : 0x9AD3FF);
-        }
-
-        if (tab == Tab.BUILD || tab == Tab.GATHER) {
-            context.text(this.font, "Item", left + 6, listTop + 6, 0x888888);
-            context.text(this.font, "Needed", left + 158, listTop + 6, 0x888888);
-            context.text(this.font, "Stored", left + 214, listTop + 6, 0x888888);
-            context.text(this.font, "Built", left + 272, listTop + 6, 0x888888);
-            context.text(this.font, "Left", left + 322, listTop + 6, 0x888888);
-
-            int index = 0;
-            for (GoalRow row : rows) {
-                int y = listTop + 24 + index * ROW_HEIGHT - scrollOffset;
-                if (y >= listTop + 22 && y < listBottom - 4) {
-                    int needed = goalNeeded(row.builtKey);
-                    int stored = goalStored(row.builtKey);
-                    int built = ConfigStore.get().built.getOrDefault(row.builtKey, 0);
-                    int leftN = Math.max(0, needed - stored - built);
-                    int color = leftN == 0 ? 0x55FF7F : 0xE0E0E0;
-                    context.text(this.font, row.label, left + 6, y + 3, color);
-                    context.text(this.font, String.format(Locale.US, "%,d", needed), left + 160, y + 3, 0x9AD3FF);
-                    context.text(this.font, String.format(Locale.US, "%,d", stored), left + 218, y + 3, 0xAAAAAA);
-                    context.text(this.font, String.format(Locale.US, "%,d", built), left + 276, y + 3, 0xCCCCCC);
-                    String leftText = String.format(Locale.US, "%,d (%,d st)", leftN, leftN / 64);
-                    context.text(this.font, leftText, left + 316, y + 3,
-                            leftN == 0 ? 0x55FF7F : 0xFFFFFF);
-                }
-                index++;
+    private void layoutRows(int left, int listTop) {
+        int index = 0;
+        for (RenderedRow row : rows) {
+            int y = listTop + 24 + index * ROW_HEIGHT - scrollOffset;
+            if (row.minus != null) {
+                row.minus.setPosition(left + 356, y);
+                row.plusOne.setPosition(left + 388, y);
+                row.plusStack.setPosition(left + 420, y);
             }
-        } else {
-            context.text(this.font, "Chest (x, y, z)", left + 6, listTop + 6, 0x888888);
-            int index = 0;
-            for (ChestStore.StoredChest c : ChestStore.chests()) {
-                int y = listTop + 24 + index * ROW_HEIGHT - scrollOffset;
-                if (y >= listTop + 22 && y < listBottom - 4) {
-                    context.text(this.font,
-                            String.format("(%d, %d, %d)  ·  %,d items",
-                                    c.pos().getX(), c.pos().getY(), c.pos().getZ(), c.total()),
-                            left + 6, y + 3, 0xE0E0E0);
-                    String topLabel = topItems(c);
-                    if (!topLabel.isEmpty()) {
-                        context.text(this.font, topLabel, left + 300, y + 3, 0x9AD3FF);
-                    }
-                }
-                index++;
-            }
-        }
-
-        super.extractRenderState(context, mouseX, mouseY, delta);
-    }
-
-    private void ensureRowsBuilt(int left, int listTop) {
-        if (rows.isEmpty() && (tab == Tab.BUILD || tab == Tab.GATHER)) {
-            buildListRows(left, listTop);
+            index++;
         }
     }
 
-    private void drawTotalsBar(GuiGraphicsExtractor context, int left, int top) {
-        int doneTotal = 0;
-        int neededAll;
-        int doneItems;
-        if (tab == Tab.BUILD) {
-            neededAll = ChecklistData.totalNeeded();
-            doneItems = 0;
-            for (ChecklistData.Goal g : ChecklistData.GOALS) {
-                int have = Math.min(g.needed(), ConfigStore.get().built.getOrDefault("b:" + g.id(), 0)
-                        + ChestStore.get(g.id()));
-                doneTotal += have;
-                if (have >= g.needed()) {
-                    doneItems++;
-                }
-            }
-        } else {
-            neededAll = ChecklistData.totalGather();
-            doneItems = 0;
-            for (ChecklistData.GatherGoal g : ChecklistData.GATHER) {
-                int stored = ChestStore.sumOf(g.matchIds());
-                int have = Math.min(g.needed(), ConfigStore.get().built.getOrDefault("g:" + g.id(), 0) + stored);
-                doneTotal += have;
-                if (have >= g.needed()) {
-                    doneItems++;
-                }
-            }
-        }
-        int pct = (int) Math.round(doneTotal * 100.0 / neededAll);
-        String name = tab == Tab.BUILD ? "built+stored" : "gathered+stored";
-        String overall = String.format(Locale.US, "%,d / %,d %s — %,d left — %d%% — %d/%d items done",
-                doneTotal, neededAll, name, Math.max(0, neededAll - doneTotal), pct, doneItems, rowCount());
-        context.text(this.font, overall, left, top + 26, pct >= 100 ? 0x55FF7F : 0x9AD3FF);
-        int barY = top + 38;
-        context.fill(left, barY, left + SCREEN_WIDTH, barY + 5, 0xFF2A2A2A);
-        int barW = (int) (SCREEN_WIDTH * Math.min(1.0, (double) doneTotal / neededAll));
-        if (barW > 0) {
-            context.fill(left, barY, left + barW, barY + 5, pct >= 100 ? 0xFF2ECC71 : 0xFF4C8CFF);
-        }
+    private int listTop(int top) {
+        return top + 76;
+    }
+
+    private void openTab(Tab newTab) {
+        Minecraft.getInstance().gui.setScreen(new ChecklistScreen(newTab));
     }
 
     private int rowCount() {
@@ -316,10 +285,9 @@ public class ChecklistScreen extends Screen {
 
     private int goalNeeded(String builtKey) {
         String id = builtKey.substring(2);
-        return tab == Tab.BUILD ? ChecklistData.needed(id) : gatherNeeded(id);
-    }
-
-    private int gatherNeeded(String id) {
+        if (tab == Tab.BUILD) {
+            return ChecklistData.needed(id);
+        }
         for (ChecklistData.GatherGoal g : ChecklistData.GATHER) {
             if (g.id().equals(id)) {
                 return g.needed();
@@ -357,6 +325,14 @@ public class ChecklistScreen extends Screen {
         }
         String s = sb.toString();
         return s.length() > 26 ? s.substring(0, 26) : s;
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        int left = (this.width - SCREEN_WIDTH) / 2;
+        int top = (this.height - SCREEN_HEIGHT) / 2;
+        layoutRows(left, listTop(top));
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     @Override
