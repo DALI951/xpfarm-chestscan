@@ -13,12 +13,31 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class ModConfig {
 
     public double radius = 4.5;
     public String outputFileName = "xpfarm-chests.json";
     public List<int[]> positions = new ArrayList<>();
+    public boolean autoDetect = true;
+    public Map<String, Integer> built = new TreeMap<>();
+
+    public void addBuilt(String id, int delta) {
+        built.merge(id, Math.max(0, delta), Integer::sum);
+        if (built.get(id) == 0) {
+            built.remove(id);
+        }
+    }
+
+    public int getBuilt(String id) {
+        return built.getOrDefault(id, 0);
+    }
+
+    public void resetBuilt() {
+        built.clear();
+    }
 
     public void addPosition(int x, int y, int z) {
         for (int[] p : positions) {
@@ -69,6 +88,14 @@ public class ModConfig {
                     }
                 }
             }
+            if (obj.has("autoDetect")) {
+                config.autoDetect = obj.get("autoDetect").getAsBoolean();
+            }
+            if (obj.has("built") && obj.get("built").isJsonObject()) {
+                for (Map.Entry<String, JsonElement> e : obj.getAsJsonObject("built").entrySet()) {
+                    config.built.put(e.getKey(), e.getValue().getAsInt());
+                }
+            }
         } catch (Exception ignored) {
         }
         return config;
@@ -78,6 +105,7 @@ public class ModConfig {
         JsonObject obj = new JsonObject();
         obj.addProperty("radius", radius);
         obj.addProperty("outputFileName", outputFileName);
+        obj.addProperty("autoDetect", autoDetect);
         JsonArray arr = new JsonArray();
         for (int[] p : positions) {
             JsonArray a = new JsonArray();
@@ -87,6 +115,11 @@ public class ModConfig {
             arr.add(a);
         }
         obj.add("positions", arr);
+        JsonObject builtObj = new JsonObject();
+        for (Map.Entry<String, Integer> e : built.entrySet()) {
+            builtObj.addProperty(e.getKey(), e.getValue());
+        }
+        obj.add("built", builtObj);
         Path path = configPath();
         try {
             Files.createDirectories(path.getParent());

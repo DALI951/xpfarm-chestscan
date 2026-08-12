@@ -1,5 +1,6 @@
 package com.dali951.xpfarmchestscan.scan;
 
+import com.dali951.xpfarmchestscan.checklist.ChestStore;
 import com.dali951.xpfarmchestscan.config.ConfigStore;
 import com.dali951.xpfarmchestscan.config.ModConfig;
 import net.minecraft.client.Minecraft;
@@ -16,13 +17,19 @@ import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.chunk.ChunkSource;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public class ChestScanner {
 
@@ -57,17 +64,16 @@ public class ChestScanner {
             return;
         }
 
-        ModConfig config = ConfigStore.get();
-        if (!anySafeHand(mc)) {
+                if (!anySafeHand(mc)) {
             sendMessage(mc, Component.literal("Both hands hold placeable items (blocks/buckets). Empty one hand so the scan can't place anything."));
             return;
         }
 
         queue.clear();
-        queue.addAll(positionsToScan(mc, config));
+        queue.addAll(detectChests(mc));
 
         if (queue.isEmpty()) {
-            sendMessage(mc, Component.translatable("xpfarm-chestscan.msg.noChests", config.radius));
+            sendMessage(mc, Component.translatable("xpfarm-chestscan.msg.noChests"));
             return;
         }
 
@@ -145,6 +151,7 @@ public class ChestScanner {
         scanning = false;
         phase = Phase.IDLE;
         clearIntercept();
+        ChestStore.applyScan(new TreeMap<>(result.totals));
         ChestDumpWriter.write(mc, result);
         if (mc.player != null) {
             mc.player.sendSystemMessage(Component.translatable(
@@ -201,25 +208,39 @@ public class ChestScanner {
         clearIntercept();
     }
 
-    private List<BlockPos> positionsToScan(Minecraft mc, ModConfig config) {
+    private List<BlockPos> detectChests(Minecraft mc) {
         List<BlockPos> out = new ArrayList<>();
-        double r2 = config.radius * config.radius;
         Set<Long> seenPairKeys = new HashSet<>();
         BlockPos playerPos = mc.player.blockPosition();
-        for (int[] p : config.positions) {
+        int pcx = playerPos.getX() >> 4;
+        int pcz = playerPos.getZ() >> 4;
+        ChunkSource src = mc.level.getChunkSource();
+        int range = 12;
+        for (int cx = pcx - range; cx <= pcx + range; cx++) {
+            for (int cz = pcz - range; cz <= pcz + range; cz++) {
+                if (!src.hasChunk(cx, cz)) {
+                    continue;
+                }
+                LevelChunk chunk = mc.level.getChunk(cx, cz);
+                for (Map.Entry<BlockPos, BlockEntity> e : chunk.getBlockEntities().entrySet()) {
+                    if (!(e.getValue() instanceof ChestBlockEntity)) {
+                        continue;
+                    }
+                    BlockPos pos = e.getKey();
+                    if (!(mc.level.getBlockState(pos).getBlock() instanceof ChestBlock)) {
+                        continue;
+                    }
+                    BlockPos primary = pairPrimary(mc, pos);
+                    if (seenPairKeys.add(primary.asLong())) {
+                        out.add(primary);
+                    }
+                }
+            }
+        }
+        for (int[] p : ConfigStore.get().positions) {
             BlockPos pos = new BlockPos(p[0], p[1], p[2]);
-            double dx = pos.getX() + 0.5 - (playerPos.getX() + 0.5);
-            double dy = pos.getY() + 0.5 - (playerPos.getY() + 0.5);
-            double dz = pos.getZ() + 0.5 - (playerPos.getZ() + 0.5);
-            if (dx * dx + dy * dy + dz * dz > r2) {
-                continue;
-            }
-            if (!(mc.level.getBlockState(pos).getBlock() instanceof ChestBlock)) {
-                continue;
-            }
-            BlockPos primary = pairPrimary(mc, pos);
-            if (seenPairKeys.add(primary.asLong())) {
-                out.add(primary);
+            if (seenPairKeys.add(pos.asLong())) {
+                out.add(pos);
             }
         }
         out.sort(null);
