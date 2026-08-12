@@ -9,6 +9,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,8 @@ import java.util.Locale;
 import java.util.Map;
 
 public class ChecklistScreen extends Screen {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("xpfarm-chestscan");
 
     private enum Tab {
         BUILD, GATHER, CHESTS
@@ -61,6 +65,9 @@ public class ChecklistScreen extends Screen {
         scrollOffset = 0;
 
         rebuildUi(left, top, listBottom);
+        LOGGER.info("xpfarm checklist opened: tab={} goalRows={} gatherRows={} chests={} width={} height={}",
+                tab, ChecklistData.GOALS.size(), ChecklistData.GATHER.size(), ChestStore.chests().size(),
+                this.width, this.height);
     }
 
     private int listTop(int left, int top) {
@@ -192,10 +199,10 @@ public class ChecklistScreen extends Screen {
         int listTop = listTop(left, top);
         int listBottom = listTop + VISIBLE_ROWS * ROW_HEIGHT;
 
-        context.fill(left, listTop, left + SCREEN_WIDTH, listBottom, 0xCC181818);
+        ensureRowsBuilt(left, listTop);
         layoutRows(left, listTop);
 
-        super.extractRenderState(context, mouseX, mouseY, delta);
+        context.fill(left, listTop, left + SCREEN_WIDTH, listBottom, 0xCC181818);
 
         context.centeredText(this.font, this.title, this.width / 2, top + 10, 0xFFFFFF);
 
@@ -252,6 +259,14 @@ public class ChecklistScreen extends Screen {
                 }
                 index++;
             }
+        }
+
+        super.extractRenderState(context, mouseX, mouseY, delta);
+    }
+
+    private void ensureRowsBuilt(int left, int listTop) {
+        if (rows.isEmpty() && (tab == Tab.BUILD || tab == Tab.GATHER)) {
+            buildListRows(left, listTop);
         }
     }
 

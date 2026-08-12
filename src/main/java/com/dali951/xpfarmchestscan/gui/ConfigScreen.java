@@ -148,8 +148,6 @@ public class ConfigScreen extends Screen {
 
         context.fill(left, listTop, left + SCREEN_WIDTH, listBottom, 0xCC181818);
 
-        super.extractRenderState(context, mouseX, mouseY, delta);
-
         context.centeredText(this.font, this.title, this.width / 2, top + 8, 0xFFFFFF);
         context.text(this.font, Component.translatable("xpfarm-chestscan.config.positions").getString(),
                 left + 6, listTop + 4, 0x9AD3FF);
@@ -186,6 +184,8 @@ public class ConfigScreen extends Screen {
                     "! vanilla reach is 4.5 — farther chests will be skipped",
                     left, outputRow + 26, 0xFFAA66);
         }
+
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     @Override

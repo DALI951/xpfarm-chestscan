@@ -49,8 +49,6 @@ public class ScanSummaryScreen extends Screen {
 
         context.fill(left - 2, top + 34, left + width + 2, top + 200, 0xCC181818);
 
-        super.extractRenderState(context, mouseX, mouseY, delta);
-
         context.centeredText(this.font, this.title, this.width / 2, top + 8, 0xFFFFFF);
         context.centeredText(this.font,
                 Component.literal(result.chests.size() + " " + Component.translatable("xpfarm-chestscan.summary.chests").getString()
@@ -76,6 +74,8 @@ public class ScanSummaryScreen extends Screen {
 
         context.text(this.font, Component.translatable("xpfarm-chestscan.summary.savedTo").getString(),
                 left + 8, top + 232, 0x888888);
+
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     @Override
