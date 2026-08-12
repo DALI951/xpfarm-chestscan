@@ -23,6 +23,7 @@
   "xpfarm-chestscan.checklist.tabChests": "3 · Chests",
   "xpfarm-chestscan.checklist.noChests": "No chests scanned yet — press V to scan, or check the output file",
   "xpfarm-chestscan.checklist.scan": "Scan chests",
+  "xpfarm-chestscan.checklist.scanPlaced": "Scan placed",
   "xpfarm-chestscan.checklist.reset": "Reset built",
   "xpfarm-chestscan.checklist.close": "Close",
   "xpfarm-chestscan.summary.title": "Scan complete",

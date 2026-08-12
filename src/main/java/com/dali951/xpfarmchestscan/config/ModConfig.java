@@ -23,6 +23,7 @@ public class ModConfig {
     public List<int[]> positions = new ArrayList<>();
     public boolean autoDetect = true;
     public Map<String, Integer> built = new TreeMap<>();
+    public Map<String, Integer> placed = new TreeMap<>();
 
     public void addBuilt(String id, int delta) {
         built.merge(id, Math.max(0, delta), Integer::sum);
@@ -35,8 +36,13 @@ public class ModConfig {
         return built.getOrDefault(id, 0);
     }
 
+    public int getPlaced(String id) {
+        return placed.getOrDefault(id, 0);
+    }
+
     public void resetBuilt() {
         built.clear();
+        placed.clear();
     }
 
     public void addPosition(int x, int y, int z) {
@@ -96,6 +102,11 @@ public class ModConfig {
                     config.built.put(e.getKey(), e.getValue().getAsInt());
                 }
             }
+            if (obj.has("placed") && obj.get("placed").isJsonObject()) {
+                for (Map.Entry<String, JsonElement> e : obj.getAsJsonObject("placed").entrySet()) {
+                    config.placed.put(e.getKey(), e.getValue().getAsInt());
+                }
+            }
         } catch (Exception ignored) {
         }
         return config;
@@ -120,6 +131,11 @@ public class ModConfig {
             builtObj.addProperty(e.getKey(), e.getValue());
         }
         obj.add("built", builtObj);
+        JsonObject placedObj = new JsonObject();
+        for (Map.Entry<String, Integer> e : placed.entrySet()) {
+            placedObj.addProperty(e.getKey(), e.getValue());
+        }
+        obj.add("placed", placedObj);
         Path path = configPath();
         try {
             Files.createDirectories(path.getParent());

@@ -2,6 +2,7 @@ package com.dali951.xpfarmchestscan;
 
 import com.dali951.xpfarmchestscan.gui.ChecklistScreen;
 import com.dali951.xpfarmchestscan.scan.ChestScanner;
+import com.dali951.xpfarmchestscan.scan.PlacedBlockScanner;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -55,6 +56,7 @@ public class XpFarmChestscanClient implements ClientModInitializer {
                 }
             }
             scanner.tick();
+            PlacedBlockScanner.INSTANCE.tick();
         });
     }
 }
